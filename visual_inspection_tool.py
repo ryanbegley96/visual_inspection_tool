@@ -1,14 +1,19 @@
-#testing visual inspection code
+#TODO - use with statement for opening images (it may alleviate the too many open images error)
+
+#visual inspection code
 import numpy as np 
 import configparser
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.widgets import Slider, Button, CheckButtons, TextBox
+from matplotlib.patches import Circle
 
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
+
+from photutils.aperture import CircularAperture
 
 from astropy.nddata import Cutout2D
 import pandas as pd
@@ -23,6 +28,11 @@ First task : get the cutouts set up for a single object, & place axes
 class VisualInspectionTool(object):
 
     def __init__(self,config_file='./visual_inspection_tool/user_VisualInspectionTool.config') -> None:
+
+        #CUSTOM
+        self.pixel_scale = 0.03
+        self.aper_size = 5.5 #pixel radius
+        #
 
         self.config = configparser.ConfigParser(inline_comment_prefixes='###',
                                                 converters={'list': lambda x: [i.strip() for i in x.split(',')]})
@@ -333,8 +343,15 @@ class VisualInspectionTool(object):
 
             im = self.vit_axs[i].imshow(cutout[0],cmap="binary_r",
                            norm=Normalize(vmin=im_percentiles[0],
-                                          vmax=im_percentiles[1]) )
+                                          vmax=im_percentiles[1]),origin='lower' )
             imshow_obj_list.append(im)
+
+            #NOTE needs proper implementation
+            mid_pos = (0.5*(float(self.config['inputs']['cutout_size'])/self.pixel_scale - 1),
+                       0.5*(float(self.config['inputs']['cutout_size'])/self.pixel_scale -1))
+            self.vit_axs[i].add_patch(Circle(mid_pos, self.aper_size,
+                                             facecolor='None',edgecolor='limegreen',lw=1,ls='-'))
+
 
         return imshow_obj_list
 
@@ -368,8 +385,8 @@ class VisualInspectionTool(object):
         elif "CDELT1" in list(hdul[0].header):
             cdelt = np.abs(hdul[0].header["CDELT1"]*3600.)
 
-        coord = SkyCoord(ra=pos[0], dec=pos[1], unit="deg")    
-
+        coord = SkyCoord(ra=pos[0], dec=pos[1], unit="deg") 
+  
         cutout = Cutout2D(hdul[0].data, coord, size/cdelt, wcs=wcs)
 
         return cutout.data,cutout.wcs
