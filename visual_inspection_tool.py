@@ -3,6 +3,7 @@
 #visual inspection code
 import numpy as np 
 import configparser
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
@@ -31,7 +32,7 @@ class VisualInspectionTool(object):
 
         #CUSTOM
         self.pixel_scale = 0.03
-        self.aper_size = 5.5 #pixel radius
+        self.aper_size = 8.3333 #pixel radius
         #
 
         self.config = configparser.ConfigParser(inline_comment_prefixes='###',
@@ -78,7 +79,6 @@ class VisualInspectionTool(object):
         self.commentBox_defaultPermu = self.get_backspace_permutations(self.commentBox_default)
         self.commentBox_coming_from_change = False
 
-        print(self.selection_comment_arr)
 
     def initialise_object_info(self):
 
@@ -92,6 +92,31 @@ class VisualInspectionTool(object):
             raise ValueError('Must be fits or csv')
 
         coord_arr = np.concatenate([ra_arr[:,None],dec_arr[:,None]],axis=1)
+
+        # ### while loop to handle multiple if/else embedded with breaking
+        # while True: # Could this be cleaner?
+            
+        #     #If outfile exists already, open, check exists
+        #     if not Path(self.config['default_outs']['output_file']).exists():
+        #         break
+            
+        #     #unless overwrite, in which, double check for input then break conditional
+        #     if bool(self.config['default_outs']['overwrite_output']):
+                
+        #         user_in = input("Are you sure you want to overwrite prev. results? [y/n]: ")
+        #         if user_in == 'y':
+        #             break #jump out of while loop to bottom if want to overwrite
+
+        #         else:
+        #             pass
+
+        #     existing_df = pd.read_csv(self.config['default_outs']['output_file'],sep='\\s+')
+
+        #     selection_arr = existing_df.selection.values.astype('<U1')            
+        #     selection_comment_arr = ['' if comment=='nan' else str(comment) 
+        #                             for comment in existing_df.comment.values.astype(str)]
+            
+        #     return id_arr,coord_arr,selection_arr,selection_comment_arr
 
         selection_arr = np.chararray(id_arr.shape,unicode=True)
         selection_arr[:] = self.config['default_outs']['selection_default_option']
@@ -131,16 +156,17 @@ class VisualInspectionTool(object):
         selection_ax = plt.axes([0.775, -0.03, 0.2, 0.4],xmargin=0,zorder=0)
         selection_ax.axis('off')
         button_selection = CheckButtons(selection_ax, labels=["Keep","Dump"], actives=[False,False])
-        for rect,lab,lines,dy in zip(button_selection.rectangles,
-                                     button_selection.labels,
-                                     button_selection.lines,
-                                     dys:=[-0.04,0.04]):
 
-            rect.set_y(rect.get_y()+dy)
-            lab.set_y(lab._y+dy)
+        # for rect,lab,lines,dy in zip(button_selection.rectangles,
+        #                              button_selection.labels,
+        #                              button_selection.lines,
+        #                              dys:=[-0.04,0.04]):
 
-            for line in lines:
-                line.set_ydata([line.get_ydata()[0]+dy,line.get_ydata()[1]+dy])
+        #     rect.set_y(rect.get_y()+dy)
+        #     lab.set_y(lab._y+dy)
+
+        #     for line in lines:
+        #         line.set_ydata([line.get_ydata()[0]+dy,line.get_ydata()[1]+dy])
 
 
         next_ax = plt.axes([0.9, 0.175, 0.05, 0.1])
