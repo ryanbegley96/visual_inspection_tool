@@ -3,7 +3,7 @@ from visual_inspection_tool import VisualInspectionTool
 
 def main():
 
-    my_config_file = '/Users/s1508137/visual_inspection_tool/user_VisualInspectionTool.config'
+    my_config_file = './test.config'
     tool = VisualInspectionTool(config_file=my_config_file)
     
     tool.show()
