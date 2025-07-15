@@ -1,6 +1,7 @@
 #TODO - use with statement for opening images (it may alleviate the too many open images error)
 
 #visual inspection code
+import sys
 import numpy as np 
 import configparser
 from pathlib import Path
@@ -74,6 +75,7 @@ class VisualInspectionTool(object):
         self.button_selection.on_clicked(self.update_selection_func)
         self.textBox_objSearch.on_submit(self.update_from_textbox)
         self.textBox_objSearch.on_text_change(self.update_on_text_change)
+        self.textBox_objSearch_defaultPermu = self.get_backspace_permutations("Not found")
         self.textBox_status = True
         
         self.textBox_objComment.on_submit(self.update_from_commentbox)
@@ -161,7 +163,7 @@ class VisualInspectionTool(object):
         else:
             raise ValueError('Must be fits or csv')
 
-        coord_arr = np.concatenate([ra_arr[:,None],dec_arr[:,None]],axis=1)[:2] ### for testing
+        coord_arr = np.concatenate([ra_arr[:,None],dec_arr[:,None]],axis=1)#[:2] ### for testing
 
         # ### while loop to handle multiple if/else embedded with breaking
         # while True: # Could this be cleaner?
@@ -206,8 +208,9 @@ class VisualInspectionTool(object):
         axs = self.turn_off_axis_info(axs)
 
         axs_labels = self.config['inputs'].getlist('input_band_names')
+        label_colour = self.config['settings'].get('aperture_colour','w')
         for i,ax in enumerate(axs):
-            ax.text(0.02,0.98,axs_labels[i],color='w',
+            ax.text(0.02,0.98,axs_labels[i],color=label_colour,
                     verticalalignment='top',
                     transform=ax.transAxes)
 
@@ -292,16 +295,13 @@ class VisualInspectionTool(object):
     
         self.cmap = new_cmap
 
+    def searchBox_reset(self):
 
-    def next_object(self,event):
+        self.textBox_status = False
+        self.textBox_objSearch.set_val("")
+        self.textBox_status = True
 
-        if self.current_object_index == len(self.id_arr)-1:
-            print('Cannot go forward: final object.')
-            return 
-        
-        self.commentBox_coming_from_change = True
-
-        self.current_object_index+=1
+    def swap_to_object(self):
         for i in range(len(self.imshow_obj_list)):
 
             self.imshow_obj_list[i].set_data(self.image_cutouts[self.current_object_index][i][0])
@@ -309,6 +309,7 @@ class VisualInspectionTool(object):
                                                      vmin=float(self.config['inputs']['c_vmin']),
                                                      vmax=float(self.config['inputs']['c_vmax']),
                                                      clean=self.config['settings'].getboolean('clean_percentiles', fallback=False))
+            
             self.imshow_obj_list[i].set_norm(Normalize(vmin=im_percentiles[0],
                                                        vmax=im_percentiles[1]) )
             self.slider_vmax.reset()
@@ -322,8 +323,20 @@ class VisualInspectionTool(object):
                 self.button_selection.set_active(i)
 
         self.commentBox_reset()  
+        self.searchBox_reset()
         self.vit_fig.canvas.draw_idle()
 
+    def next_object(self,event):
+
+        if self.current_object_index == len(self.id_arr)-1:
+            print('Cannot go forward: final object.')
+            return 
+        
+        self.commentBox_coming_from_change = True
+
+        self.current_object_index+=1
+        self.swap_to_object()
+       
     def prev_object(self,event):
 
         if self.current_object_index == 0:
@@ -331,26 +344,7 @@ class VisualInspectionTool(object):
             return 
         
         self.current_object_index-=1
-        for i in range(len(self.imshow_obj_list)):
-
-            self.imshow_obj_list[i].set_data(self.image_cutouts[self.current_object_index][i][0])
-            im_percentiles = self.get_im_percentiles(im=self.image_cutouts[self.current_object_index][i][0],
-                                                     vmin=float(self.config['inputs']['c_vmin']),
-                                                     vmax=float(self.config['inputs']['c_vmax']),
-                                                     clean=self.config['settings'].getboolean('clean_percentiles', fallback=False))
-            self.imshow_obj_list[i].set_norm(Normalize(vmin=im_percentiles[0],
-                                                       vmax=im_percentiles[1]) )
-            self.slider_vmax.reset()
-            self.update_axs_title(self.current_object_index)
-            self.vit_fig.canvas.draw_idle()
-
-        #reset check boxes when changing obj
-        current_button_status = np.array(self.button_selection.get_status())
-        for i,status in enumerate(current_button_status):
-            if status:
-                self.button_selection.set_active(i)
-
-        self.commentBox_reset()   
+        self.swap_to_object()
 
     def update_axs_title(self,index):
         self.axs_title.set_text(f'ID = {self.id_arr[index]}   ({index+1}/{len(self.id_arr)}),   z={self.redshift_arr[index]}')
@@ -360,7 +354,7 @@ class VisualInspectionTool(object):
 
         #index is what was just selected
         index = [x._text for x in self.button_selection.labels].index(label)
-        
+
         current_button_status = np.array(self.button_selection.get_status())
 
         if current_button_status[index] & current_button_status[int(not index)]:
@@ -386,43 +380,88 @@ class VisualInspectionTool(object):
                 id_to_find_idx = np.argwhere(contained_bool)[0][0]
                 id_to_find = self.id_arr[self.id_arr==expression][0]
 
-
                 self.current_object_index = id_to_find_idx
-                for i in range(len(self.imshow_obj_list)):
-                    self.imshow_obj_list[i].set_data(self.image_cutouts[self.current_object_index][i][0])
-                    im_percentiles = self.get_im_percentiles(im=self.image_cutouts[self.current_object_index][i][0],
-                                                     vmin=float(self.config['inputs']['c_vmin']),
-                                                     vmax=float(self.config['inputs']['c_vmax']),
-                                                     clean=self.config['settings'].getboolean('clean_percentiles', fallback=False))
-                    self.imshow_obj_list[i].set_norm(Normalize(vmin=im_percentiles[0],
-                                                       vmax=im_percentiles[1]) )
+                self.swap_to_object()
 
-                    self.slider_vmax.reset()
-                    self.update_axs_title(self.current_object_index)
-                    self.vit_fig.canvas.draw_idle()
+            elif expression[:2] in ['i:',"j:"]:
+                # Treat as index search
+                id_to_find_idx = int(expression[2:]) - 1  # Convert to zero-based index
+                
+                if 0 <= id_to_find_idx < len(self.id_arr):
+                    self.current_object_index = id_to_find_idx
 
-                #reset check boxes when changing obj
-                current_button_status = np.array(self.button_selection.get_status())
-                for i,status in enumerate(current_button_status):
-                    if status:
-                        self.button_selection.set_active(i)
-                self.textBox_objSearch.set_val("")
+                    self.swap_to_object()
 
-                self.commentBox_reset()
-      
-                        
+                else:
+                    print(f"Index {id_to_find_idx+1} out of range. Valid range is 1 to {len(self.id_arr)}.")
+                    self.textBox_objSearch.set_val('Not found')
+                    self.textBox_status = False
+                    return
+
+                
             else:
                 self.textBox_objSearch.set_val('Not found')
                 self.textBox_status = False
 
         self.vit_fig.canvas.draw_idle()
 
+    def update_on_text_change_mechanism(self):
+        if not self.textBox_status:
+            self.textBox_objSearch.set_val("")
+        self.textBox_status = True
+
+    def detect_change_in_search_box(self,expression):
+
+        N = len(expression)
+        benchmark_str = "Not found"
+            
+        has_match = False
+        for j in range(N):
+
+            part1 = expression[:j]
+            part2 = expression[j+1:]
+
+            if part1+part2 == benchmark_str:
+                has_match = True
+                break
+
+        return has_match
+
     def update_on_text_change(self,expression):
+        
+
+        if expression == "":
+            return
+        
+        if expression.isdecimal():
+
+            starts_with_bool = np.char.startswith(self.id_arr,expression)
+
+            # If no objects start with the expression, return
+            if not np.any(starts_with_bool):
+                self.textBox_objSearch.set_val('Not found')
+                self.textBox_status = False
+                return
+
+            if np.count_nonzero(starts_with_bool) == 1:
+                # If only one object starts with the expression, set it as current object
+                id_to_find_idx = np.argwhere(starts_with_bool)[0][0]
+                self.current_object_index = id_to_find_idx
+                self.swap_to_object()
+
+                return
 
         if expression == 'Not found':
-            if not self.textBox_status:
-                self.textBox_objSearch.set_val("")
-            self.textBox_status = True
+            self.update_on_text_change_mechanism()
+        
+        # Get all permutations of "Not found" with number added in middle
+        elif expression in self.textBox_objSearch_defaultPermu: 
+            # Check if expression is in default permutations [i.e., Not Found minus a character]
+            self.update_on_text_change_mechanism()
+
+        elif self.detect_change_in_search_box(expression):
+            # If expression is a permutation of "Not found" with a character removed / added
+            self.update_on_text_change_mechanism()
 
         self.vit_fig.canvas.draw_idle()
 
@@ -529,22 +568,44 @@ class VisualInspectionTool(object):
         """
 
         image_cutouts_list = []
+        
+        N_images = len(self.input_image_files)
+        N_objects = len(self.coord_arr)
+        image_counter = 1
+
         for im_file in self.input_image_files:
             
+            image_print_str = f'Processing image {image_counter}/{N_images} : {im_file.split("/")[-1]}'
+
             hdul = fits.open(im_file)
 
             single_image_cutouts_list = []
+            object_counter = 1
+
             for coord in self.coord_arr:
                 
                 c,c_wcs = self.make_single_cutout(coord,hdul,float(self.config['inputs']['cutout_size']))
                 single_image_cutouts_list.append([c,c_wcs])
 
+                object_print_str = f'Processing object {object_counter}/{N_objects}'
+
+                if self.config['settings'].getboolean('show_progress_bar', fallback=False):
+                    sys.stdout.write("\x1b[1A")
+                    sys.stdout.write(f"{image_print_str}\x1b[K\n")
+                    sys.stdout.write(f"{object_print_str}\x1b[K\r")
+                
+                object_counter += 1 
+
             del hdul
             image_cutouts_list.append(single_image_cutouts_list)
+
+            image_counter += 1
 
         # flip list from list of single image cutouts to list of single object cutouts
         object_cutouts_list = list(zip(*image_cutouts_list))
 
+        # End sys.stdout.write to clear the last line 
+        print('')
         return object_cutouts_list
 
     @staticmethod
@@ -557,8 +618,12 @@ class VisualInspectionTool(object):
             # remove exactly zero values
             im = im[im!=0]
 
-        im_percentiles = np.percentile(im,[vmin,vmax])
-        
+        # check if im is empty after cleaning
+        if im.size == 0:
+            return np.array([0, 1])  # return default percentiles if empty
+
+        im_percentiles = np.nanpercentile(im,[vmin,vmax])
+ 
         return im_percentiles
 
     @staticmethod

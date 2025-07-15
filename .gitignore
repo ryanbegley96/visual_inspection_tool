@@ -1,0 +1,13 @@
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!visual_inspection_tool.py
+!run_VisInspecTool.py
+!user_VisualInspectionTool.config
+!README.md
+!catalogue_selection.dat
+
+# ...even if they are in subdirectories
+!*/
